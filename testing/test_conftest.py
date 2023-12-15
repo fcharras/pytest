@@ -212,12 +212,12 @@ def test_setinitial_conftest_subdirs(pytester: Pytester, name: str) -> None:
     subconftest.touch()
     pm = PytestPluginManager()
     conftest_setinitial(pm, [sub.parent], confcutdir=pytester.path)
-    key = subconftest.resolve()
+    key = os.path.normcase(os.path.normpath(subconftest.resolve()))
     if name not in ("whatever", ".dotdir"):
-        assert pm.has_plugin(str(key))
+        assert pm.has_plugin(key)
         assert len(set(pm.get_plugins()) - {pm}) == 1
     else:
-        assert not pm.has_plugin(str(key))
+        assert not pm.has_plugin(key)
         assert len(set(pm.get_plugins()) - {pm}) == 0
 
 

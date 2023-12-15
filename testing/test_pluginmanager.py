@@ -368,7 +368,7 @@ class TestPytestPluginManager:
             pytester.makepyfile("pytest_plugins='xyz'"), root=pytester.path
         )
         with pytest.raises(ImportError):
-            pytestpm.consider_conftest(mod)
+            pytestpm.consider_conftest(mod, name=str(mod.__file__))
 
 
 class TestPytestPluginManagerBootstrapming:
