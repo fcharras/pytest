@@ -3,6 +3,9 @@ import importlib.metadata
 import os
 import sys
 import types
+import subprocess
+import textwrap
+from pathlib import Path
 
 import pytest
 from _pytest.config import ExitCode
@@ -1389,3 +1392,54 @@ def test_doctest_and_normal_imports_with_importlib(pytester: Pytester) -> None:
     )
     result = pytester.runpytest_subprocess()
     result.stdout.fnmatch_lines("*1 passed*")
+
+
+def test_issue_9765(pytester: Pytester) -> None:
+    """Reproducer for issue #9765 on Windows
+
+    https://github.com/pytest-dev/pytest/issues/9765
+    """
+    Path("setup.py").write_text(
+            textwrap.dedent("""
+            from setuptools import setup
+
+            if __name__ == '__main__':
+                setup(name='my_package')
+        """
+                            )
+    )
+    Path("pytest.ini").write_text(
+        textwrap.dedent("""
+            [pytest]
+            addopts = "-p my_package.plugin.my_plugin"
+        """
+                        )
+    )
+    pkg = pytester.mkpydir("my_package")
+    pkg.joinpath("conftest.py").write_text("")
+    pkg.joinpath("test_foo.py").write_text("def test(): pass")
+
+    plugin_dir = pytester.mkpydir("my_package/plugin")
+    plugin_dir.joinpath("my_plugin.py").write_text(
+        textwrap.dedent("""
+    import pytest
+
+    def pytest_configure(config):
+
+        class SimplePlugin:
+            @pytest.fixture(params=[1, 2, 3])
+            def my_fixture(self, request):
+                yield request.param
+
+        config.pluginmanager.register(SimplePlugin())
+    """
+        )
+    )
+
+    pytester.run(sys.executable, "setup.py", "develop")
+    # We are using subprocess.run rather than pytester.run on purpose.
+    # pytester.run is adding the current directory to PYTHONPATH which avoids
+    # the bug. We also use pytest rather than python -m pytest for the same
+    # PYTHONPATH reason.
+    subprocess.check_output(["pytest", "my_package"])
+
